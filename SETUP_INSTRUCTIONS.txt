@@ -1,0 +1,126 @@
+================================================================================
+          AI FUTURE PROCESS DESIGNER - EVALUATOR SETUP & VERIFICATION GUIDE
+================================================================================
+
+PROJECT OVERVIEW:
+-----------------
+AI Future Process Designer takes manual or legacy retail operational workflows
+(entered as high-level process info and free-text descriptions), automatically
+converts them into structured PostgreSQL process records, and transforms them into
+an optimized future-state design using a 5-Stage LangGraph AI agent workflow,
+live web research evidence, and human/AI responsibility mapping.
+
+DEMO VIDEO:
+-----------
+https://vimeo.com/1219206345?fl=ip&fe=ec
+
+
+================================================================================
+METHOD 1: QUICK START WITH DOCKER COMPOSE (RECOMMENDED)
+================================================================================
+
+PREREQUISITES:
+- Docker Desktop installed & running
+
+COMMANDS:
+1. Open Terminal/PowerShell in project directory:
+   cd c:\Users\Lenovo\OneDrive\Desktop\AIFutureProcess
+
+2. Build and launch Docker containers:
+   docker-compose up --build
+
+ACCESS POINTS (ONCE HEALTHY):
+- Streamlit Frontend Web UI : http://localhost:8501
+- FastAPI Backend Docs      : http://localhost:8000/docs
+- API Health Endpoint       : http://localhost:8000/api/v1/health
+
+
+================================================================================
+METHOD 2: LOCAL SETUP WITHOUT DOCKER
+================================================================================
+
+PREREQUISITES:
+- Python 3.11+
+- PostgreSQL server with pgvector extension enabled
+
+COMMANDS:
+1. Install Python dependencies:
+   pip install -r requirements.txt
+
+2. Copy environment template:
+   cp .env.example .env
+
+3. Start FastAPI Backend Server:
+   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+4. Start Streamlit Frontend UI (in a separate terminal window):
+   streamlit run app/ui/app.py
+
+
+================================================================================
+EVALUATOR VERIFICATION & TESTING WALKTHROUGH
+================================================================================
+
+TEST 1: TESTING PRELOADED RETAIL PROCESSES
+-------------------------------------------
+1. Open Streamlit UI in browser: http://localhost:8501
+2. Select "Inventory Management / Replenishment" from sidebar dropdown.
+3. Review the current baseline operational activities in the "Current State Process" tab.
+4. Click "🚀 Transform Process with AI".
+5. Watch progress indicator advance through the 5 LangGraph workflow stages:
+   - Stage 1: Process Analysis & Query Formulation
+   - Stage 2: Live External Web Research & Vector Indexing
+   - Stage 3: AI Opportunity Analysis & Provenance Linkage
+   - Stage 4: Future Process Design & Responsibility Assignment
+   - Stage 5: Validation & Persistence to PostgreSQL
+6. Inspect generated results across tabs:
+   - "✨ Future State Process & Provenance": Examine step execution types
+     (Human vs AI) and evidence labels (EVIDENCE_BACKED vs ANALYTIC_RECOMMENDATION).
+   - "🔍 Live External Research Evidence": View live web search snippets, URLs,
+     and retrieval timestamps stored in PostgreSQL.
+   - "📊 Impact & Assumptions": Review qualitative impact levels, process assumptions,
+     qualitative benefits, and operational risks.
+
+
+TEST 2: DYNAMIC EVALUATION (CUSTOM PROCESS CREATION & DERIVATION)
+------------------------------------------------------------------
+1. Click "➕ Create Custom Process" in the sidebar.
+2. Enter custom process inputs:
+   - Process Name: e.g. Customer Returns & Refund Management
+   - Industry: e.g. Retail / E-commerce
+   - Overview: e.g. Receiving, inspecting, and refunding returned merchandise.
+   - Current Process / Activities: Enter simple bullet points/text, e.g.:
+     * Support staff receive return request emails in Zendesk.
+     * Warehouse staff inspect returned items manually.
+     * Finance team approves and processes credit card refunds.
+   - Key Problems / Bottlenecks: Enter pain points, e.g.:
+     * High triage delays in email tickets.
+     * Inspection bottlenecks cause grading errors.
+     * Manual refund processing takes 10 to 14 days.
+3. Click "Save Process & Derive Model".
+4. Verify the backend AI extracts structured activity records with explicit roles
+   ("Support staff", "Warehouse staff", "Finance") and systems ("Zendesk") in PostgreSQL.
+5. Click "🚀 Transform Process with AI" to execute transformation.
+6. Verify full CURRENT → TRANSITION → FUTURE visualization.
+7. Test process deletion: Click "🗑️ Delete" to cleanly remove the process and its data.
+
+
+TEST 3: AUTOMATED UNIT & INTEGRATION TEST SUITE
+------------------------------------------------
+Run pytest from workspace root:
+   python -m pytest
+
+Expected Result:
+   All test modules (including workflow state transitions, persistence isolation,
+   unstructured extraction, and Customer Returns role mapping) pass with 100% success.
+
+
+================================================================================
+KEY ENDPOINTS FOR API TESTING:
+================================================================================
+GET    http://localhost:8000/api/v1/processes          - List all processes
+POST   http://localhost:8000/api/v1/processes          - Create custom process
+GET    http://localhost:8000/api/v1/processes/{id}     - Get process details & runs
+POST   http://localhost:8000/api/v1/processes/{id}/transform - Trigger LangGraph run
+DELETE http://localhost:8000/api/v1/processes/{id}     - Delete process
+================================================================================
