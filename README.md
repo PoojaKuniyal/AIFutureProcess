@@ -6,17 +6,13 @@
 
 ## 📌 Project Overview & Purpose
 
-**What it does:**  
-AI Future Process Designer takes manual or legacy retail operational workflows entered as high-level process information and free-text descriptions, automatically converting them into structured process activities before transforming them into an optimized future-state design using a 5-stage LangGraph AI agent workflow,live web research evidence, and human/AI responsibility mapping.
+### What it does
 
-**Why it is needed:**  
-Traditional business process re-engineering is time-consuming, costly, and frequently plagued by ungrounded AI hallucinations or static ROI claims. This system solves these challenges by enforcing mandatory evidence provenance (classifying recommendations as `EVIDENCE_BACKED` vs `ANALYTIC_RECOMMENDATION`), indexing research snippets using vector embeddings in PostgreSQL/pgvector, and clearly defining execution boundaries (`human`, `AI-assisted`, `automated`, `human-in-the-loop`) to enable evidence-grounded operational decisions.
+**AI Future Process Designer** takes manual or legacy retail operational workflows entered as high-level process information and free-text descriptions, automatically converting them into structured process activities before transforming them into an optimized future-state design using a **5-stage LangGraph AI workflow**, live web research evidence, and human/AI responsibility mapping.
 
----
+### Why it is needed
 
-## 🎥 Demo Video
-
-▶️ **Watch the Full Video Walkthrough**: [https://vimeo.com/1219206345?fl=ip&fe=ec](https://vimeo.com/1219206345?fl=ip&fe=ec)
+Traditional business process re-engineering can be time-consuming and costly, while AI-generated process recommendations can suffer from ungrounded claims or unsupported ROI estimates. This system addresses these challenges by enforcing mandatory evidence provenance (classifying recommendations as `EVIDENCE_BACKED` vs. `ANALYTIC_RECOMMENDATION`), indexing research evidence using vector embeddings in **PostgreSQL/pgvector**, and clearly defining execution boundaries (`human`, `AI-assisted`, `automated`, `human-in-the-loop`) to support evidence-grounded operational decisions.
 
 ---
 
@@ -108,10 +104,9 @@ Current activities, future activities, AI interventions, roles, systems, decisio
 
 ---
 
-## 📄 Evaluator Setup Guide
+## 📄 Setup Guide
 
-For a standalone plain text guide that evaluators can view or print, see [`SETUP_INSTRUCTIONS.txt`](file:///c:/Users/Lenovo/OneDrive/Desktop/AIFutureProcess/SETUP_INSTRUCTIONS.txt).
-
+For a standalone plain text see [`SETUP_INSTRUCTIONS.txt`]
 ---
 
 ## ⚡ Quick Start with Docker Compose
