@@ -1,18 +1,6 @@
 ================================================================================
-          AI FUTURE PROCESS DESIGNER - EVALUATOR SETUP & VERIFICATION GUIDE
+                HOW TO EVALUATE/ RUN
 ================================================================================
-
-PROJECT OVERVIEW:
------------------
-AI Future Process Designer takes manual or legacy retail operational workflows
-(entered as high-level process info and free-text descriptions), automatically
-converts them into structured PostgreSQL process records, and transforms them into
-an optimized future-state design using a 5-Stage LangGraph AI agent workflow,
-live web research evidence, and human/AI responsibility mapping.
-
-DEMO VIDEO:
------------
-https://vimeo.com/1219206345?fl=ip&fe=ec
 
 
 ================================================================================
@@ -23,7 +11,7 @@ PREREQUISITES:
 - Docker Desktop installed & running
 
 COMMANDS:
-1. Open Terminal/PowerShell in project directory:
+1. Open Terminal/PowerShell in project directory: E.g.
    cd c:\Users\Lenovo\OneDrive\Desktop\AIFutureProcess
 
 2. Build and launch Docker containers:
