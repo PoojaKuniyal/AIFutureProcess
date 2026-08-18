@@ -87,14 +87,14 @@ class LLMAdapter:
         """
         system_prompt = (
             "You are a business process architecture expert. "
-            "Analyze the given retail process overview, activities text, and key problems text. "
+            "Analyze the given business process overview, activities text, and key problems text. "
             "Extract 2 to 5 distinct operational activities. "
             "Return JSON with key 'activities' containing a list of objects with fields:\n"
             "- sequence_order: integer\n"
             "- name: concise activity title\n"
             "- description: detailed description of the activity based strictly on user input\n"
-            "- role: human role explicitly mentioned or performing this step (e.g. 'Support staff', 'Store or warehouse staff', 'Finance', 'Inventory staff'). If no role is stated, use 'Not specified'.\n"
-            "- system: software/tools/systems explicitly mentioned with this step (e.g. 'Zendesk', 'ERP', 'Email', 'POS', 'Manual clipboard'). If no system is stated, use 'Not specified'.\n"
+            "- role: human role explicitly mentioned or performing this step (e.g. 'HR Specialist', 'IT Administrator', 'Support staff', 'Finance', 'Inventory staff'). If no role is stated, use 'Not specified'.\n"
+            "- system: software/tools/systems explicitly mentioned with this step (e.g. 'Workday', 'Jira', 'Zendesk', 'ERP', 'Email', 'POS'). If no system is stated, use 'Not specified'.\n"
             "- operational_problem: the specific operational problem or bottleneck from the problems text that semantically describes this activity's pain point. If no problem applies to this activity, use 'Not specified'.\n"
             "\nGROUNDING RULE: Extract explicit roles and systems accurately. Do NOT invent unstated roles/systems. Map operational problems semantically based on topic relevance."
         )
@@ -151,12 +151,12 @@ class LLMAdapter:
 
         # Roles extraction patterns
         role_patterns = [
-            r'\b(support staff|customer service|customer support|warehouse worker|warehouse staff|store or warehouse staff|store staff|finance team|finance staff|finance|inventory staff|inventory planner|store associate|store manager|operational staff|planner|analyst|agent|worker|staff|associate|manager)\b',
+            r'\b(hr specialist|hr team|hr manager|hr lead|onboarding specialist|hiring manager|recruiter|it administrator|it specialist|it support|support staff|customer service|customer support|warehouse worker|warehouse staff|store or warehouse staff|store staff|finance team|finance staff|finance|inventory staff|inventory planner|store associate|store manager|operational staff|planner|analyst|agent|worker|staff|associate|manager|specialist|coordinator|lead|officer|administrator|admin|developer|engineer|auditor)\b',
         ]
         
         # Systems extraction patterns
         system_patterns = [
-            r'\b(zendesk|erp|pos|excel|spreadsheet|email|e-mail|barcode scanner|web portal|crm|wms|payment gateway|database|clipboard|manual paper|sap|oracle)\b',
+            r'\b(workday|bamboohr|hris|ats|servicenow|jira|zendesk|okta|active directory|slack|teams|docusign|google workspace|outlook|erp|pos|excel|spreadsheet|email|e-mail|barcode scanner|web portal|crm|wms|payment gateway|database|clipboard|manual paper|sap|oracle)\b',
         ]
 
         # Parse problem entries

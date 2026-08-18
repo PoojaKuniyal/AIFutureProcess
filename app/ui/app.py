@@ -131,7 +131,24 @@ def fetch_process_detail(proc_id):
         st.error(f"Error fetching process details: {e}")
     return None
 
+def poll_transformation_status(proc_id, max_retries=6, delay=3.0):
+    """
+    Polls the backend database status to verify if a background transformation completed.
+    Returns the process detail dictionary if completed, or latest detail if still processing.
+    """
+    for _ in range(max_retries):
+        detail = fetch_process_detail(proc_id)
+        if detail and detail.get("future_process") and detail["future_process"].get("status") == "COMPLETED":
+            return detail
+        time.sleep(delay)
+    return fetch_process_detail(proc_id)
+
 def run_transformation(proc_id):
+    if st.session_state.get(f"is_transforming_{proc_id}", False):
+        st.warning("⏳ Transformation is already in progress. Please wait for completion.")
+        return None
+
+    st.session_state[f"is_transforming_{proc_id}"] = True
     status_placeholder = st.empty()
     progress_bar = st.progress(0)
     
@@ -145,23 +162,47 @@ def run_transformation(proc_id):
     
     for idx, stage_msg in enumerate(stages):
         status_placeholder.info(f"⏳ **Transforming...** {stage_msg}")
-        progress_bar.progress(int((idx + 1) * 20))
-        time.sleep(0.3)
+        progress_bar.progress(int((idx + 1) * 18))
+        time.sleep(0.2)
         
     try:
-        res = requests.post(f"{BACKEND_URL}/api/v1/processes/{proc_id}/transform", timeout=60)
+        # Increased HTTP request timeout to 300s (5 minutes) for live web research & LLM synthesis
+        res = requests.post(f"{BACKEND_URL}/api/v1/processes/{proc_id}/transform", timeout=300)
         progress_bar.progress(100)
         if res.status_code == 200:
             status_placeholder.success("✅ **Transformation Complete!** Results persisted to PostgreSQL database.")
-            time.sleep(0.5)
+            # Fetch actual completed state directly from backend to avoid stale cache
+            fresh_detail = fetch_process_detail(proc_id)
+            if fresh_detail:
+                st.session_state[f"proc_detail_{proc_id}"] = fresh_detail
+            st.session_state[f"is_transforming_{proc_id}"] = False
+            time.sleep(0.4)
             status_placeholder.empty()
             progress_bar.empty()
+            st.rerun()
             return res.json()
         else:
             status_placeholder.error(f"Transformation failed: {res.text}")
+    except (requests.exceptions.Timeout, requests.exceptions.ReadTimeout) as e:
+        status_placeholder.info("⏳ **Transformation is taking longer than expected as live web research is being processed.** Checking backend database status...")
+        fresh_detail = poll_transformation_status(proc_id, max_retries=6, delay=3.0)
+        if fresh_detail and fresh_detail.get("future_process") and fresh_detail["future_process"].get("status") == "COMPLETED":
+            st.session_state[f"proc_detail_{proc_id}"] = fresh_detail
+            status_placeholder.success("✅ **Transformation completed and persisted to PostgreSQL!**")
+            st.session_state[f"is_transforming_{proc_id}"] = False
+            time.sleep(0.4)
+            status_placeholder.empty()
+            progress_bar.empty()
+            st.rerun()
+            return fresh_detail
+        else:
+            if fresh_detail:
+                st.session_state[f"proc_detail_{proc_id}"] = fresh_detail
+            status_placeholder.info("⏳ **Transformation is still executing on the backend.** Click '🔄 Refresh Data' in the sidebar or wait a moment to load the completed future state.")
     except Exception as e:
         status_placeholder.error(f"Error triggering transformation: {e}")
         
+    st.session_state[f"is_transforming_{proc_id}"] = False
     progress_bar.empty()
     return None
 
@@ -188,7 +229,7 @@ processes = fetch_processes()
 proc_options = {p["name"]: p["id"] for p in processes}
 
 selected_proc_name = st.sidebar.selectbox(
-    "Select Retail Process",
+    "Select Process",
     options=list(proc_options.keys()) if proc_options else ["Inventory Management / Replenishment"]
 )
 
@@ -199,24 +240,24 @@ if st.sidebar.button("➕ Create Custom Process", use_container_width=True):
 
 # --- MAIN CONTENT LAYOUT ---
 st.markdown('<div class="main-header">AI Future Process Designer</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">Enterprise Retail Process Optimization — Explore where AI can be integrated into enterprise retail processes to improve efficiency, reduce operational bottlenecks, and enable smarter workflows</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Enterprise Business Process Optimization — Explore where AI can be integrated into enterprise processes to improve efficiency, reduce operational bottlenecks, and enable smarter workflows</div>', unsafe_allow_html=True)
 
 # Custom Process Creation Form
 if st.session_state.get("show_custom_form", False):
-    st.subheader("Define a New Retail Process")
+    st.subheader("Define a New Custom Process")
     st.info("Dynamic Evaluation: Enter your process description and bottlenecks below. The AI pipeline will automatically derive structured activities, roles, systems, and AI opportunities for PostgreSQL storage.")
     
     with st.form("custom_proc_form"):
-        c_name = st.text_input("Process Name", placeholder="e.g., Seasonal Inventory Clearance & Markdowns")
-        c_ind = st.text_input("Industry / Business Context", placeholder="e.g., Retail / E-commerce")
+        c_name = st.text_input("Process Name", placeholder="e.g., Employee Onboarding & Provisioning")
+        c_ind = st.text_input("Industry / Business Context", placeholder="e.g., Human Resources, Healthcare, Retail")
         c_desc = st.text_area("Process Overview", placeholder="Brief high-level summary of the business process...")
         c_proc_text = st.text_area(
             "Current Process / Activities",
-            placeholder="Enter a simple list or description of current steps:\n- Step 1: Weekly stock audit and inventory check\n- Step 2: Manual tag printing and shelf replacement"
+            placeholder="Enter a simple list or description of current steps:\n- Step 1: Collect employee ID documents and forms\n- Step 2: IT provisions user accounts and equipment"
         )
         c_prob_text = st.text_area(
             "Key Problems / Bottlenecks",
-            placeholder="Describe operational pain points, manual delays, or errors:\n- Sales data lags by 3 days causing stockouts\n- Manual tagging leads to high pricing mismatch errors"
+            placeholder="Describe operational pain points, manual delays, or errors:\n- Manual document verification delays start dates by 5 days\n- Account provisioning requires manual email exchanges"
         )
         
         col_cancel, col_submit = st.columns([1, 4])
@@ -240,15 +281,27 @@ if st.session_state.get("show_custom_form", False):
                 }
                 res = requests.post(f"{BACKEND_URL}/api/v1/processes", json=payload)
                 if res.status_code == 201:
+                    data = res.json()
                     st.success("New process analyzed and structured components saved to PostgreSQL!")
                     st.session_state["show_custom_form"] = False
+                    new_id = data.get("process_id")
+                    if new_id:
+                        st.session_state[f"proc_detail_{new_id}"] = fetch_process_detail(new_id)
                     st.rerun()
                 else:
                     st.error(f"Failed to save custom process: {res.text}")
 
 elif selected_proc_name and proc_options:
     selected_id = proc_options[selected_proc_name]
-    proc_detail = fetch_process_detail(selected_id)
+    
+    # Always ensure fresh process details are available or synchronized
+    cached_detail = st.session_state.get(f"proc_detail_{selected_id}")
+    if not cached_detail or st.sidebar.button("🔄 Refresh Data", key=f"ref_{selected_id}"):
+        cached_detail = fetch_process_detail(selected_id)
+        if cached_detail:
+            st.session_state[f"proc_detail_{selected_id}"] = cached_detail
+            
+    proc_detail = cached_detail or fetch_process_detail(selected_id)
     
     if proc_detail:
         st.subheader(f"📌 {proc_detail['name']}")
@@ -257,13 +310,17 @@ elif selected_proc_name and proc_options:
 
         future_proc = proc_detail.get("future_process")
         has_transformed = bool(future_proc and future_proc.get("future_activities"))
+        is_transforming = st.session_state.get(f"is_transforming_{selected_id}", False)
 
         # Header Status Dashboard
         m1, m2, m3 = st.columns([1.5, 2, 2.5])
         with m1:
             st.metric("Current Activities", len(proc_detail['current_activities']))
         with m2:
-            if has_transformed:
+            if is_transforming:
+                st.markdown('<div class="status-pending">⏳ Transformation Running...</div>', unsafe_allow_html=True)
+                st.caption("5-Stage LangGraph Engine Active")
+            elif has_transformed:
                 st.markdown('<div class="status-completed">🟢 Transformation Completed</div>', unsafe_allow_html=True)
                 if future_proc.get("created_at"):
                     st.caption(f"Executed: {future_proc['created_at'][:16].replace('T', ' ')} UTC")
@@ -273,13 +330,15 @@ elif selected_proc_name and proc_options:
         with m3:
             col_tf, col_del = st.columns([3, 1])
             with col_tf:
-                if st.button("🚀 Transform Process with AI", type="primary", use_container_width=True):
+                button_label = "⏳ Transforming..." if is_transforming else "🚀 Transform Process with AI"
+                if st.button(button_label, type="primary", use_container_width=True, disabled=is_transforming):
                     run_transformation(selected_id)
-                    st.rerun()
             with col_del:
-                if st.button("🗑️ Delete", use_container_width=True, help="Delete this process and all its data from PostgreSQL"):
+                if st.button("🗑️ Delete", use_container_width=True, help="Delete this process and all its data from PostgreSQL", disabled=is_transforming):
                     res_del = requests.delete(f"{BACKEND_URL}/api/v1/processes/{selected_id}")
                     if res_del.status_code == 200:
+                        st.session_state.pop(f"proc_detail_{selected_id}", None)
+                        st.session_state.pop(f"is_transforming_{selected_id}", None)
                         st.success("Process deleted successfully!")
                         st.rerun()
                     else:

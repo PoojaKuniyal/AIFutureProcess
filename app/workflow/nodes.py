@@ -18,12 +18,19 @@ logger = logging.getLogger(__name__)
 def node_stage1_process_analysis(state: ProcessState) -> Dict[str, Any]:
     """Stage 1: Process Analysis & Query Formulation."""
     activities = state.get("current_activities", [])
-    process_name = state.get("process_name", "Retail Process")
+    process_name = state.get("process_name", "Business Process")
+    industry = state.get("industry", "").strip()
+
+    if industry and industry.lower() not in process_name.lower():
+        context_prefix = f"{industry} {process_name}"
+    else:
+        context_prefix = process_name
     
     queries = []
     for act in activities:
         prob = act.get("operational_problem") or act.get("description") or act.get("name")
-        query = f"retail {process_name} AI automation solution for {act['name']} {prob[:80]}"
+        prob_str = prob[:80] if prob and prob != "Not specified" else ""
+        query = f"{context_prefix} AI automation solution for {act['name']} {prob_str}".strip()
         queries.append(query)
         
     return {
@@ -35,6 +42,7 @@ def node_stage2_research_evidence(state: ProcessState, db_session: Session = Non
     """Stage 2: Live External Research & Vector Indexing."""
     queries = state.get("research_queries", [])
     process_id = state.get("process_id")
+    process_name = state.get("process_name", "Business Process")
     run_id = state.get("transformation_run_id")
     activities = state.get("current_activities", [])
     
@@ -53,7 +61,7 @@ def node_stage2_research_evidence(state: ProcessState, db_session: Session = Non
         for item in search_results:
             ev_id = f"ev-{uuid.uuid4().hex[:8]}"
             snippet = item.get("snippet", "")
-            title = item.get("title", "Retail AI Research")
+            title = item.get("title", f"{process_name} AI Research")
             url = item.get("source_url", "https://duckduckgo.com")
             
             embedding = EmbeddingService.embed_text(f"{title} {snippet}")
@@ -105,6 +113,8 @@ def node_stage3_ai_opportunity(state: ProcessState) -> Dict[str, Any]:
     """Stage 3: AI Opportunity Analysis & Mandatory Evidence Provenance Linkage."""
     activities = state.get("current_activities", [])
     evidence_items = state.get("research_evidence", [])
+    process_name = state.get("process_name", "Business Process")
+    industry = state.get("industry", "")
     
     opportunities: List[AIOpportunityDict] = []
     
@@ -123,12 +133,12 @@ def node_stage3_ai_opportunity(state: ProcessState) -> Dict[str, Any]:
         else:
             prov_type = "ANALYTIC_RECOMMENDATION"
             ev_id = None
-            rationale = "AI analytical suggestion based on process optimization heuristics (Not backed by live external evidence)."
+            rationale = f"AI analytical suggestion based on {process_name} optimization heuristics (Not backed by live external evidence)."
             
         opp_id = f"opp-{uuid.uuid4().hex[:8]}"
         
-        tech_cat = _derive_tech_category(act_name, problem)
-        solution = _derive_solution(act_name, problem, tech_cat)
+        tech_cat = _derive_tech_category(act_name, problem, industry=industry, process_name=process_name)
+        solution = _derive_solution(act_name, problem, tech_cat, process_name=process_name)
         
         opportunities.append({
             "opportunity_id": opp_id,
@@ -149,6 +159,7 @@ def node_stage4_future_design(state: ProcessState) -> Dict[str, Any]:
     """Stage 4: Future Process Design & Responsibility Assignment."""
     activities = state.get("current_activities", [])
     opportunities = state.get("ai_opportunities", [])
+    process_name = state.get("process_name", "Business Process")
     
     opp_map = {o["target_activity_id"]: o for o in opportunities}
     future_activities: List[FutureActivityDict] = []
@@ -157,7 +168,7 @@ def node_stage4_future_design(state: ProcessState) -> Dict[str, Any]:
         act_id = act.get("activity_id")
         opp = opp_map.get(act_id)
         
-        exec_type, sys_name, role_name = _classify_responsibility(act.get("name", ""), opp)
+        exec_type, sys_name, role_name = _classify_responsibility(act, opp, process_name)
         
         prov_status = opp.get("provenance_type", "ANALYTIC_RECOMMENDATION") if opp else "ANALYTIC_RECOMMENDATION"
         linked_ev_id = opp.get("linked_evidence_id") if opp else None
@@ -190,7 +201,7 @@ def node_stage4_future_design(state: ProcessState) -> Dict[str, Any]:
 def node_stage5_validation_persistence(state: ProcessState, db_session: Session = None) -> Dict[str, Any]:
     """Stage 5: Dynamic Process-Grounded Validation & Database Persistence."""
     process_id = state.get("process_id", "unknown-proc")
-    process_name = state.get("process_name", "Retail Process")
+    process_name = state.get("process_name", "Business Process")
     run_id = state.get("transformation_run_id") or f"run-{uuid.uuid4().hex[:8]}"
     current_activities = state.get("current_activities", [])
     future_activities = state.get("future_activities", [])
@@ -213,7 +224,7 @@ def node_stage5_validation_persistence(state: ProcessState, db_session: Session 
     qual_benefits = []
     for act in current_activities:
         prob = act.get("operational_problem")
-        if prob:
+        if prob and prob != "Not specified":
             qual_benefits.append(f"Resolves operational bottleneck in '{act['name']}': {prob[:110]}")
         else:
             qual_benefits.append(f"Optimizes throughput and eliminates operational friction in '{act['name']}'.")
@@ -248,13 +259,13 @@ def node_stage5_validation_persistence(state: ProcessState, db_session: Session 
     })
     
     # Process-Grounded Dynamic Explicit Assumptions
-    roles_list = list(set([act.get("role", "Operational Staff") for act in current_activities]))
-    roles_str = ", ".join(roles_list)
+    roles_list = list(set([act.get("role") for act in current_activities if act.get("role") and act.get("role") != "Not specified"]))
+    roles_str = ", ".join(roles_list) if roles_list else "Operational personnel"
     
     assumptions = [
         f"Primary enterprise systems ({systems_str}) expose REST API or database connector interfaces.",
         f"Operational personnel in roles ({roles_str}) participate in human-in-the-loop exception reviews.",
-        f"POS and operational log data streams are ingested daily into {process_name} AI services."
+        f"Operational activity logs and data streams from {systems_str} are ingested daily into {process_name} AI services."
     ]
     
     impact_assessment: QualitativeImpactAssessmentDict = {
@@ -311,26 +322,40 @@ def node_stage5_validation_persistence(state: ProcessState, db_session: Session 
         "status": "COMPLETED"
     }
 
-def _derive_tech_category(act_name: str, problem: str) -> str:
-    name_lower = (act_name + " " + problem).lower()
-    if any(k in name_lower for k in ["forecast", "demand", "sales", "reorder", "quantity"]):
+def _derive_tech_category(act_name: str, problem: str, industry: str = "", process_name: str = "") -> str:
+    combined = (act_name + " " + problem + " " + industry + " " + process_name).lower()
+    if any(k in combined for k in ["document", "paperwork", "form", "verification", "identity", "compliance", "audit", "contract", "id"]):
+        return "Autonomous Document AI & Intelligent Verification"
+    elif any(k in combined for k in ["ticket", "inquiry", "support", "chat", "onboarding", "orientation", "portal", "training", "helpdesk", "email"]):
+        return "Generative Agent & Conversational Assistant"
+    elif any(k in combined for k in ["forecast", "demand", "sales", "reorder", "quantity", "predict", "analytic", "scoring"]):
         return "Predictive Analytics & ML Forecasting"
-    elif any(k in name_lower for k in ["pick", "pack", "inspect", "returned", "warehouse"]):
+    elif any(k in combined for k in ["pick", "pack", "inspect", "returned", "warehouse", "vision", "image", "hardware"]):
         return "Computer Vision & Robotics Automation"
-    elif any(k in name_lower for k in ["ticket", "lookup", "dispute", "customer", "support"]):
-        return "Generative Agent & NLP Automation"
-    elif any(k in name_lower for k in ["vendor", "scorecard", "po", "purchase", "compliance"]):
+    elif any(k in combined for k in ["vendor", "scorecard", "po", "purchase", "provisioning", "account", "setup"]):
         return "Autonomous Document AI & Workflow Robotics"
     return "Intelligent Business Process Automation"
 
-def _derive_solution(act_name: str, problem: str, tech_cat: str) -> str:
-    return f"Deploy {tech_cat} engine to continuously ingest operational signals, resolve '{problem[:60]}', and trigger automated workflow actions."
+def _derive_solution(act_name: str, problem: str, tech_cat: str, process_name: str = "") -> str:
+    prob_desc = f", resolve '{problem[:60]}'" if problem and problem != "Not specified" else ""
+    return f"Deploy {tech_cat} engine to streamline '{act_name}'{prob_desc}, and trigger automated workflow actions."
 
-def _classify_responsibility(act_name: str, opp: Dict[str, Any]):
+def _classify_responsibility(act: Dict[str, Any], opp: Dict[str, Any], process_name: str = ""):
     cat = opp.get("ai_technology_category", "") if opp else ""
-    if "Predictive Analytics" in cat or "NLP" in cat:
-        return "AI-assisted", "AI Analytics Platform", "Domain Specialist Reviewer"
-    elif "Robotics" in cat or "Document AI" in cat:
-        return "automated", "Automated Workflow Engine", None
+    act_role = act.get("role") if act.get("role") and act.get("role") != "Not specified" else None
+    act_sys = act.get("system") if act.get("system") and act.get("system") != "Not specified" else None
+
+    human_role = act_role or "Domain Specialist Reviewer"
+
+    if act_sys:
+        primary_sys = f"{act_sys} + AI Agent"
     else:
-        return "human-in-the-loop", "Enterprise ERP + AI Agent", "Approving Manager"
+        primary_sys = f"Enterprise Platform ({process_name})"
+
+    if "Predictive Analytics" in cat or "Conversational Assistant" in cat:
+        return "AI-assisted", primary_sys, human_role
+    elif "Robotics" in cat or "Document AI" in cat:
+        governance_role = f"{act_role} (Exception Oversight)" if act_role else None
+        return "automated", primary_sys if act_sys else f"Automated Workflow Engine ({cat})", governance_role
+    else:
+        return "human-in-the-loop", primary_sys, human_role

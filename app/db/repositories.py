@@ -101,6 +101,17 @@ class ProcessRepository:
         evidence_id: Optional[str] = None,
         transformation_run_id: Optional[str] = None
     ) -> ResearchEvidenceModel:
+        if transformation_run_id:
+            future_proc = db.query(FutureProcessModel).filter(FutureProcessModel.id == transformation_run_id).first()
+            if not future_proc:
+                future_proc = FutureProcessModel(
+                    id=transformation_run_id,
+                    process_id=process_id,
+                    status="IN_PROGRESS"
+                )
+                db.add(future_proc)
+                db.flush()
+
         ev_id = evidence_id or str(uuid.uuid4())
         evidence = ResearchEvidenceModel(
             id=ev_id,
@@ -146,7 +157,7 @@ class ProcessRepository:
         impact_assessment: Dict[str, Any],
         transformation_run_id: str
     ) -> FutureProcessModel:
-        # Fetch existing IN_PROGRESS record created at start of run
+        # Fetch existing IN_PROGRESS record created at start of run or ensure it exists
         future_proc = db.query(FutureProcessModel).filter(FutureProcessModel.id == transformation_run_id).first()
         if not future_proc:
             future_proc = FutureProcessModel(
@@ -158,6 +169,11 @@ class ProcessRepository:
             db.flush()
 
         future_proc.status = "COMPLETED"
+
+        # Clear existing activities and impact assessment if re-running to avoid duplicates
+        db.query(FutureActivityModel).filter(FutureActivityModel.future_process_id == future_proc.id).delete()
+        db.query(ImpactAssessmentModel).filter(ImpactAssessmentModel.future_process_id == future_proc.id).delete()
+        db.flush()
 
         for idx, act in enumerate(future_activities, 1):
             future_act = FutureActivityModel(
